@@ -23,6 +23,7 @@
 #include <unistd.h>
 
 #include "bands.h"
+#include "cw_utils.h"
 #include "sendqrg.h"
 #include "startmsg.h"
 #include "gettxinfo.h"
@@ -69,6 +70,7 @@ int init_tlf_rig(void) {
     dcd_type_t dcd_type = RIG_DCD_NONE;
 
     const struct rig_caps *caps;
+    value_t rig_cwspeed;
 
     /*
      * allocate memory, setup & open port
@@ -98,6 +100,14 @@ int init_tlf_rig(void) {
 	} else {
 	    rigptt = 0;
 	    showmsg("Controlling PTT via Hamlib is not supported for that rig!");
+	}
+    }
+
+    if (cwkeyer == HAMLIB_KEYER) {
+	/* FIXME: query actual rig (might vary when going through rigctld */
+	if (rig_get_function_ptr(myrig_model, RIG_FUNCTION_SEND_MORSE) == NULL) {
+	    cwkeyer = NO_KEYER;
+	    showmsg("Sending Morse via Hamlib is not supported for that rig!");
 	}
     }
 
@@ -135,6 +145,19 @@ int init_tlf_rig(void) {
     }
 
     shownr("Freq =", (int) rigfreq);
+
+    if (cwkeyer == HAMLIB_KEYER) {
+	retcode = rig_get_level(my_rig, RIG_VFO_CURR, RIG_LEVEL_KEYSPD, &rig_cwspeed); /* read cw speed from rig */
+
+	if (retcode == RIG_OK) {
+	    shownr("CW speed = ", (int) rig_cwspeed.i);
+	    SetCWSpeed(rig_cwspeed.i);
+	} else {
+	    showmsg("Could not read CW speed from rig");
+	    if (!debugflag)
+		return -1;
+	}
+    }
 
     if (debugflag) {	// debug rig control
 	debug_tlf_rig();
